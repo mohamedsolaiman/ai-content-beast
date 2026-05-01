@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+data/content_log/*.json
+data/youtube_cache/*.json
+data/analytics/*.json
+!data/content_log/.gitkeep
+!data/youtube_cache/.gitkeep
+!data/analytics/.gitkeep
+src/data/
+dashboard/data.json

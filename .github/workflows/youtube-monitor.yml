@@ -1,0 +1,76 @@
+name: Monitor YouTube
+on:
+  schedule:
+    # Every 2 hours
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  youtube-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check @theAIsearch for New Videos
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+        working-directory: src
+        run: python -m youtube_monitor.monitor
+
+      - name: Post YouTube Supporting Content
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_BUSINESS_ACCOUNT_ID: ${{ secrets.INSTAGRAM_BUSINESS_ACCOUNT_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
+          REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        working-directory: src
+        run: |
+          if [ -f "data/latest_youtube_content.json" ]; then
+            python -c "
+          import json, os, sys
+          sys.path.insert(0, '.')
+          from social_posters.posters import MasterPoster
+          with open('data/latest_youtube_content.json') as f:
+              videos = json.load(f)
+          if videos:
+              poster = MasterPoster()
+              for v in videos:
+                  # Post YouTube content to all platforms
+                  versions = {p: v['content'] for p in ['twitter','instagram','facebook','linkedin','reddit','telegram']}
+                  results = poster.post_to_all(versions)
+                  print(json.dumps(results, indent=2))
+          fi
+
+      - name: Collect Analytics
+        working-directory: src
+        run: python -m analytics.collector
+
+      - name: Commit Data
+        run: |
+          git config --global user.name "AI Content Beast"
+          git config --global user.email "aicontentbeast@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "YouTube monitoring update at $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
